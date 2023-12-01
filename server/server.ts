@@ -38,6 +38,9 @@ async function start () {
 
       const employees = await db.collection("employees").find().toArray();
       const assignments = await db.collection("assignments").find().toArray();
+
+      // Prevent multiple assignments for an employee
+      db.createIndex("assignments", "employeeId", { unique: true });
       const product = await db.collection("product").findOne();
 
       socket.emit("employees", employees);
@@ -60,29 +63,36 @@ async function start () {
       // sleep for 500ms to simulate latency
       await sleep()
 
-      // Add assignment to database
-      const { insertedId } = await db.collection("assignments").insertOne(assignment);
+      // Add assignment to database (and catch the error if it exists)
+      const insertedId = await db.collection("assignments").insertOne(assignment).then(async (insertResult)=> {
 
-      await db.collection("product").updateOne(
-        {},
-        {
-          $inc: {
-            [`marketingPoints.${channel}`]: 1,
-          },
+        // Only update the marketing points for the product if an assignment was created
+        await db.collection("product").updateOne(
+          {},
+          {
+            $inc: {
+              [`marketingPoints.${channel}`]: 1,
+            },
+          }
+        );
+        return insertResult.insertedId;
+      }).catch((error: any) => {
+        if (error.code === 11000) {
+          console.error("Assignment ignored - Duplicate index error");
         }
-      );
-
+      });
       // sleep for 500ms to simulate latency
       await sleep()
 
-      const newAssignment = await db.collection("assignments").findOne({
-        _id: insertedId,
-      });
-
-      const updatedProduct = await db.collection("product").findOne();
-
-      io.emit("product", updatedProduct);
-      io.emit("assignment_add", newAssignment);
+      // Only refresh the UI if an assignment was created
+      if (insertedId) {
+        const newAssignment = await db.collection("assignments").findOne({
+          _id: insertedId,
+        });
+        const updatedProduct = await db.collection("product").findOne();
+        io.emit("assignment_add", newAssignment);
+        io.emit("product", updatedProduct);
+      }    
     });
 
     // Listen for deleted assignment
@@ -98,27 +108,34 @@ async function start () {
       // sleep for 500ms to simulate latency
       await sleep()
 
-      // Delete assignment from database
-      await db.collection("assignments").deleteOne({
+      // Delete assignment from database (if it exists)
+      const deletedCount = await db.collection("assignments").deleteOne({
         _id: new ObjectId(assignmentId),
-      });
+      }).then(async ({deletedCount}) => {
 
-      await db.collection("product").updateOne(
-        {},
-        {
-          $inc: {
-            [`marketingPoints.${assignment.channel}`]: -1,
-          },
+        // Only update the marketing points for a product if an assignment was deleted
+        if (deletedCount) {
+          await db.collection("product").updateOne(
+            {},
+            {
+              $inc: {
+                [`marketingPoints.${assignment.channel}`]: -1,
+              },
+            }
+          );
         }
-      );
+        return deletedCount;
+      })
 
       // sleep for 500ms to simulate latency
       await sleep()
 
-      const updatedProduct = await db.collection("product").findOne();
-
-      io.emit("product", updatedProduct);
-      io.emit("assignment_remove", assignmentId);
+      // Only refresh the UI if an assignment was deleted
+      if (deletedCount) {
+        const updatedProduct = await db.collection("product").findOne();
+        io.emit("product", updatedProduct);
+        io.emit("assignment_remove", assignmentId);
+      }
     });
   });
 

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { useLiveUpdatedEmployeeAndAssignmentDataThoughSocket } from "./hooks";
 import { MarketingChannels } from "../types";
 import ChannelAssignment from "./ChannelAssignment";
@@ -11,12 +11,23 @@ const EmployeeAssignment = () => {
   // assignments: Assignment[];
   const { employees, assignments, product } = useLiveUpdatedEmployeeAndAssignmentDataThoughSocket();
 
-  const idleEmployees = employees.filter(
-    (employee) => !assignments.some(
-      (assignment) => assignment.employeeId === employee._id)
-  );
+  // Only recalculate the idle employees array if the employees array or the assignments array change changes
+  const idleEmployees = useMemo(() => {
+    return employees.filter(
+      (employee) =>
+        !assignments.some(
+          (assignment) => assignment.employeeId === employee._id
+        )
+    );
+  }, [employees, assignments]);
 
-  const estimatedSoldProducts = Object.values(product?.marketingPoints || {}).reduce((a, b) => a + b, 0) * 100
+  // Only recalculate the sold products total if the product changes
+  const estimatedSoldProducts = useMemo(() => {
+    return (
+      Object.values(product?.marketingPoints || {}).reduce((a, b) => a + b, 0) *
+      100
+    );
+  }, [product]);
 
   return (
     <div>
