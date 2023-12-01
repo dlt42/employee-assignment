@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback, useMemo } from "react";
 import { Assignment, Employee, MarketingChannels, Product } from "../types";
 import { socket } from "./socket";
 
@@ -19,21 +19,30 @@ const ChannelAssignment = (props: Props) => {
     product
   } = props;
 
-  const assignmentsForChannelProduct = assignments.filter(
-    (assignment) => assignment.channel === channel
+  // Only update the assignents for the product channel if the dependencies change
+  const assignmentsForChannelProduct = useMemo(
+    () => assignments.filter((assignment) => assignment.channel === channel),
+    [assignments, channel]
   );
 
-  const handleUnassign = (assignment: Assignment) => {
+  // Only create the handleUnassign callback once
+  const handleUnassign = useCallback((assignment: Assignment) => {
     socket.emit("unassign", assignment._id);
-  }
+  }, []);
 
-  const handleAssign = () => {
+
+  // Only create the handleUnassign callback if the idleEmployees prop or channel prop changes
+  const handleAssign = useCallback(() => {
     const idleEmployee = idleEmployees[0];
     socket.emit("assign", {
       channel,
       employeeId: idleEmployee._id,
     });
-  }
+  }, [idleEmployees, channel]);
+
+  // Using useCallback prevents memoized downstream components from rerendering or any instances of useEffect 
+  // with the callback as a dependency from being triggered if the component rerendered (without useCallback 
+  // the callback would be recreated on every rerender and trigger downstream updates)
 
   return (
     <div>

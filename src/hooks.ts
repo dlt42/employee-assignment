@@ -6,9 +6,6 @@ export const useLiveUpdatedEmployeeAndAssignmentDataThoughSocket = () => {
   const [product, setProduct] = useState<Product | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
-
-  const data = { product, employees, assignments };
-
   useEffect(() => {
     // Get inital data
     socket.emit("initial");
@@ -54,5 +51,5 @@ export const useLiveUpdatedEmployeeAndAssignmentDataThoughSocket = () => {
     }
   }, []);
 
-  return data;
+  return { product, employees, assignments };
 }
