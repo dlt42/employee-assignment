@@ -28,7 +28,7 @@ async function start () {
   clearDatabase();
   seedDatabase();
 
-  server.listen(3001);
+  await server.listen(3001);
   // Set up socket.io connection handler
   io.on("connection", async (socket) => {
     console.log("Client connected to socket.io server");
